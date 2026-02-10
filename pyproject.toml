@@ -1,0 +1,38 @@
+[project]
+name = "rt-model-inference"
+version = "1.0"
+description = "A reference implementation of the real-time model inference algorithms implemented in LiME"
+readme = "README.md"
+authors = [
+    { name = "Björn Brandenburg", email = "bbb@mpi-sws.org" }
+]
+requires-python = ">=3.12"
+dependencies = []
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://lime.mpi-sws.org"
+Repository = "https://gitlab.mpi-sws.org/LiME/py-rt-model-inference"
+Issues = "https://gitlab.mpi-sws.org/LiME/py-rt-model-inference/-/issues"
+
+[build-system]
+requires = ["uv_build>=0.10.0,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.37.1",
+    "pytest>=9.0.2",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.14.11",
+]
