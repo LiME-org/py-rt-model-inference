@@ -10,6 +10,7 @@ from rt_model_inference.certain_periodic import (
     derived_model_candidates,
     initial_candidate_periods,
     trailing_zeroes,
+    truncate_to_max_len,
     validate_periodic_tunables,
 )
 
@@ -168,6 +169,9 @@ def infer_certain_fit_periodic_model(
             # subsequent batch
             running_mean = running_mean + (min_jitter_model.period - running_mean) / k
 
+            # Take stock of how many candidates we have.
+            mc_count = len(model_candidates)
+
             # Derive some new model candidates.
             dmc = derived_model_candidates(
                 batch_last_processed_index(batch, overlap),
@@ -191,6 +195,9 @@ def infer_certain_fit_periodic_model(
                 if mc.jitter <= negligible_jitter_threshold
                 or mc.jitter <= best.jitter * jitter_pruning_threshold
             ]
+
+            # Ensure the candidate set doesn't grow.
+            truncate_to_max_len(model_candidates, mc_count)
 
     # All batches processed, now choose the best remaining model.
 
@@ -324,6 +331,9 @@ def infer_possible_fit_periodic_model(
             # subsequent batch
             running_mean = running_mean + (min_jitter_model.period - running_mean) / k
 
+            # Take stock of how many candidates we have.
+            mc_count = len(model_candidates)
+
             # Derive some new model candidates.
             dmc = derived_model_candidates(
                 batch_last_processed_index(batch, overlap),
@@ -354,6 +364,9 @@ def infer_possible_fit_periodic_model(
                 ]
             else:
                 model_candidates = list(updated_candidates)
+
+            # Ensure the candidate set doesn't grow.
+            truncate_to_max_len(model_candidates, mc_count)
 
     # All batches processed, now choose the best remaining model.
 

@@ -1,29 +1,39 @@
 import csv
 import os
+from itertools import batched
 from pathlib import Path
 
 import pytest
 
 from rt_model_inference import (
+    infer_certain_fit_periodic_model,
     infer_delta_max,
     infer_delta_max_hi,
     infer_delta_max_lo,
     infer_delta_min,
     infer_delta_min_hi,
     infer_delta_min_lo,
+    infer_periodic_model,
+    infer_possible_fit_periodic_model,
 )
 from rt_model_inference.extractors import (
+    CertainFitPeriodicExtractor,
     DeltaMaxExtractor,
     DeltaMaxHiExtractor,
     DeltaMaxLoExtractor,
     DeltaMinExtractor,
     DeltaMinHiExtractor,
     DeltaMinLoExtractor,
+    PeriodicExtractor,
+    PossibleFitPeriodicExtractor,
 )
 from rt_model_inference.time import Instant, ReleaseWindow
 from rt_model_inference.validate import (
     dmax_curve_lower_bounds_releases,
     dmin_curve_upper_bounds_releases,
+    model_covers_all,
+    model_intersects_all,
+    model_is_conservative,
 )
 
 DEFAULT_TRACE_DIR = Path(__file__).parent / "traces" / "sporadic"
@@ -103,3 +113,57 @@ def test_sporadic_model_inference_on_sporadic_trace_file(
     ex_dmax_hi = DeltaMaxHiExtractor(nmax=nmax)
     ex_dmax_hi.feed(windows)
     assert ex_dmax_hi.current_model == dmax_hi
+
+
+# allow access to "private" fields in the test below
+# pyright: reportPrivateUsage=false
+
+
+@pytest.mark.parametrize("trace_file_name", TRACE_FILE_NAMES)
+def test_periodic_model_inference_on_sporadic_trace_file(trace_file_name: str):
+
+    # As these traces are not periodic, this tests mainly model divergence.
+    releases_and_windows = load_release_trace(TRACE_DIR / trace_file_name)
+    releases = list((r for r, _ in releases_and_windows))
+    windows = list((w for _, w in releases_and_windows))
+
+    BS = 128
+    exact = infer_periodic_model(releases, batch_size=BS)
+    assert model_is_conservative(exact, releases)
+
+    cf_model = infer_certain_fit_periodic_model(windows, batch_size=BS)
+    assert model_covers_all(cf_model, windows)
+
+    pf_model = infer_possible_fit_periodic_model(windows, batch_size=BS)
+    assert model_intersects_all(pf_model, windows)
+
+    ex_exact = PeriodicExtractor(batch_size=BS)
+    mc_count = None
+    for batch in batched(releases, BS // 2):
+        ex_exact.feed(batch)
+        # ensure model candidate count is monotonic
+        assert mc_count is None or len(ex_exact._candidates) <= mc_count
+        if mc_count is not None or ex_exact._candidates:
+            mc_count = len(ex_exact._candidates)
+    assert ex_exact.current_model == exact
+
+    ex_cf = CertainFitPeriodicExtractor(batch_size=BS)
+    mc_count = None
+    for batch in batched(windows, BS // 2):
+        ex_cf.feed(batch)
+        # ensure model candidate count is monotonic
+        assert mc_count is None or len(ex_cf._candidates) <= mc_count
+        if mc_count is not None or ex_cf._candidates:
+            mc_count = len(ex_cf._candidates)
+
+    assert ex_cf.current_model == cf_model
+
+    ex_pf = PossibleFitPeriodicExtractor(batch_size=BS)
+    mc_count = None
+    for batch in batched(windows, BS // 2):
+        ex_pf.feed(batch)
+        # ensure model candidate count is monotonic
+        assert mc_count is None or len(ex_pf._candidates) <= mc_count
+        if mc_count is not None or ex_pf._candidates:
+            mc_count = len(ex_pf._candidates)
+    assert ex_pf.current_model == pf_model

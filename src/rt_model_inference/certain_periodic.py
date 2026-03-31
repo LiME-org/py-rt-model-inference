@@ -55,6 +55,15 @@ def trailing_zeroes(n: int) -> int:
     return count
 
 
+def truncate_to_max_len(candidates: list[PeriodicModel], max_len: int) -> None:
+    # Using something more "fancy" like heapq.nsmallest() or sorted() is not
+    # worth it since we're removing at most two elements, and in expectation
+    # close to none.
+    while len(candidates) > max_len:
+        worst_idx = max(range(len(candidates)), key=lambda i: candidates[i].jitter)
+        del candidates[worst_idx]
+
+
 def batch_last_processed_index(
     batch: Batch,
     overlap: int,
@@ -254,6 +263,9 @@ def infer_periodic_model(
             # subsequent batch
             running_mean = running_mean + (min_jitter_model.period - running_mean) / k
 
+            # Take stock of how many candidates we have.
+            mc_count = len(model_candidates)
+
             # Derive some new model candidates.
             dmc = derived_model_candidates(
                 batch_last_processed_index(batch, overlap),
@@ -276,6 +288,9 @@ def infer_periodic_model(
                 if mc.jitter <= negligible_jitter_threshold
                 or mc.jitter <= best.jitter * jitter_pruning_threshold
             ]
+
+            # Ensure the candidate set doesn't grow.
+            truncate_to_max_len(model_candidates, mc_count)
 
     # All batches processed, now choose the best remaining model.
 

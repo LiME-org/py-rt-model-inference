@@ -6,6 +6,7 @@ from rt_model_inference.certain_periodic import (
     derived_model_candidates,
     initial_candidate_periods,
     trailing_zeroes,
+    truncate_to_max_len,
     validate_periodic_tunables,
 )
 from rt_model_inference.time import Duration, ReleaseWindow
@@ -105,6 +106,9 @@ class CertainFitPeriodicExtractor:
             if mc.jitter <= self._negligible_jitter_threshold
             or mc.jitter <= best.jitter * self._jitter_pruning_threshold
         ]
+
+        # Ensure the candidate set doesn't grow.
+        truncate_to_max_len(candidates, len(self._candidates))
 
         return running_mean, candidates
 
@@ -262,6 +266,9 @@ class PossibleFitPeriodicExtractor:
             ]
         else:
             candidates = list(candidates)
+
+        # Ensure the candidate set doesn't grow.
+        truncate_to_max_len(candidates, len(self._candidates))
 
         return running_mean, candidates
 

@@ -56,7 +56,7 @@ def expected_period(trace_file_name: str) -> int | None:
 
 
 @pytest.mark.parametrize("trace_file_name", TRACE_FILE_NAMES)
-def test_periodic_model_inference_on_trace_file(trace_file_name: str):
+def test_periodic_model_inference_on_periodic_trace_file(trace_file_name: str):
     releases_and_windows = load_release_trace(TRACE_DIR / trace_file_name)
     releases = list((r for r, _ in releases_and_windows))
     windows = list((w for _, w in releases_and_windows))
