@@ -1,6 +1,6 @@
 [project]
 name = "rt-model-inference"
-version = "1.0"
+version = "1.0.1"
 description = "A reference implementation of the real-time model inference algorithms implemented in LiME"
 readme = "README.md"
 authors = [
