@@ -352,6 +352,8 @@ def infer_possible_fit_periodic_model(
                     if mc.jitter <= negligible_jitter_threshold
                     or mc.jitter <= best.jitter * jitter_pruning_threshold
                 ]
+            else:
+                model_candidates = list(updated_candidates)
 
     # All batches processed, now choose the best remaining model.
 
