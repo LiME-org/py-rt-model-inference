@@ -17,6 +17,7 @@ from rt_model_inference.extractors import (
     DeltaMinExtractor,
     DeltaMinHiExtractor,
     DeltaMinLoExtractor,
+    MaxResourceUseExtractor,
     PeriodicExtractor,
     PossibleFitPeriodicExtractor,
     SporadicExtractor,
@@ -30,6 +31,7 @@ from . import (
     infer_delta_min,
     infer_delta_min_hi,
     infer_delta_min_lo,
+    infer_max_resource_use,
     infer_periodic_model,
     infer_possible_fit_periodic_model,
     infer_sporadic_model,
@@ -80,20 +82,30 @@ def parse_cmdline(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Model to infer (default: delta-min).",
     )
     _ = parser.add_argument(
+        "-r",
+        "--resource-use",
+        action="store_true",
+        help=(
+            "Infer a maximum observed resource-use vector from one resource "
+            "consumption amount per input line."
+        ),
+    )
+    _ = parser.add_argument(
         "input",
         nargs="?",
         default="-",
-        help="Input file path with one release time per line. Use '-' or omit for stdin.",
+        help=(
+            "Input file path. Release modes expect one release time or release "
+            "window per line; resource-use mode expects one resource amount per "
+            "line. Use '-' or omit for stdin."
+        ),
     )
     _ = parser.add_argument(
         "-n",
         "--n-max",
-        type=partial(range_checked_int, min=2),
+        type=partial(range_checked_int, min=1),
         default=None,
-        help=(
-            "Maximum number of jobs (`nmax`) for delta-min, delta-max, and "
-            "delta-min-hi/delta-min-lo inference."
-        ),
+        help=("Maximum number of jobs (`nmax`) for vector-valued inference models."),
     )
     _ = parser.add_argument(
         "-s",
@@ -145,6 +157,19 @@ def parse_release_windows(lines: Iterable[str]) -> Iterator[ReleaseWindow]:
                 f"invalid release window at line {line_number}: lower bound exceeds upper bound"
             )
         yield (lo, hi)
+
+
+def parse_resource_amounts(lines: Iterable[str]) -> Iterator[int]:
+    for line_number, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if stripped == "":
+            continue
+        try:
+            yield int(stripped)
+        except ValueError as exc:
+            raise ValueError(
+                f"invalid resource amount at line {line_number}: {stripped!r}"
+            ) from exc
 
 
 def exact_release_times(
@@ -222,6 +247,19 @@ def sporadic_model(
         )
     else:
         return str(minimum_separation)
+
+
+def resource_use_model(
+    observations: Iterable[int],
+    _model: ModelName,
+    n_max: int | None,
+    output_json: bool,
+) -> str:
+    vec = infer_max_resource_use(observations, nmax=n_max)
+    if output_json:
+        return json.dumps({"model": "maximum cumulative resource use", "vector": vec})
+    else:
+        return " ".join(str(resource_amount) for resource_amount in vec)
 
 
 INFERENCE_ALGORITHMS = {
@@ -385,6 +423,46 @@ def streaming_sporadic_model(
         yield "]"
 
 
+def streaming_resource_use_model(
+    observations: Iterable[int],
+    _model: ModelName,
+    n_max: int | None,
+    output_json: bool,
+    output_every: int,
+) -> Iterator[str]:
+    @no_type_check
+    def as_str(vec):
+        if output_json:
+            return json.dumps(
+                {"model": "maximum cumulative resource use", "vector": vec}
+            )
+        else:
+            return " ".join(str(resource_amount) for resource_amount in vec)
+
+    ex = MaxResourceUseExtractor(nmax=n_max)
+    first = True
+    if output_json:
+        yield "["
+
+    if output_every > 0:
+        for batch in batched(observations, output_every):
+            ex.feed(batch)
+            if output_json:
+                yield f"  {', ' if not first else ''}{as_str(ex.current_model)}"
+                first = False
+            else:
+                yield as_str(ex.current_model)
+    else:
+        ex.feed(observations)
+        if output_json:
+            yield f"  {as_str(ex.current_model)}"
+        else:
+            yield as_str(ex.current_model)
+
+    if output_json:
+        yield "]"
+
+
 STREAMING_INFERENCE_ALGORITHMS = {
     ModelName.DELTA_MIN: partial(streaming_vector_model, DeltaMinExtractor, True),
     ModelName.DELTA_MAX: partial(streaming_vector_model, DeltaMaxExtractor, True),
@@ -410,6 +488,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     n_max = cast(int | None, args.n_max)
     stream = cast(int | None, args.stream)
     output_json = cast(bool, args.json)
+    resource_use = cast(bool, args.resource_use)
 
     input_stream = sys.stdin
     if input_path != "-":
@@ -423,7 +502,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
 
     try:
-        if stream is not None:
+        if resource_use:
+            observations = parse_resource_amounts(input_stream)
+            if stream is not None:
+                for output in streaming_resource_use_model(
+                    observations,
+                    model,
+                    n_max,
+                    output_json,
+                    stream,
+                ):
+                    print(output)
+            else:
+                print(resource_use_model(observations, model, n_max, output_json))
+        elif stream is not None:
             if model in STREAMING_INFERENCE_ALGORITHMS:
                 alg = STREAMING_INFERENCE_ALGORITHMS[model]
                 for output in alg(

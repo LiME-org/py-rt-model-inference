@@ -1,5 +1,6 @@
 from .certain_periodic import PeriodicExtractor
 from .certain_sporadic import DeltaMaxExtractor, DeltaMinExtractor, SporadicExtractor
+from .resource_use import MaxResourceUseExtractor
 from .uncertain_periodic import (
     CertainFitPeriodicExtractor,
     PossibleFitPeriodicExtractor,
@@ -22,4 +23,5 @@ __all__ = [
     "PeriodicExtractor",
     "CertainFitPeriodicExtractor",
     "PossibleFitPeriodicExtractor",
+    "MaxResourceUseExtractor",
 ]

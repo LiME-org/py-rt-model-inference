@@ -20,12 +20,17 @@ For _uncertain_ release windows:
 - `infer_certain_fit_periodic_model`: infer a periodic model from a sequence of release windows that _fully covers_ every release window.
 - `infer_possible_fit_periodic_model`: infer a periodic model from a sequence of release windows that _intersects_ every release window.
 
+For per-job resource-consumption observations:
+
+- `infer_max_resource_use`: infer a vector that upper-bounds the maximum cumulative resource use of consecutive jobs.
+
 The above-mentioned APIs are "one-shot" procedures, consuming all given input in one go and producing a model as a result. Additionally, the library provides _streaming extractor_ variants of all these algorithms, which consume input continuously and can be queried at any time to obtain the model inferred _so far_. The streaming extractor classes can be imported from `rt_model_inference.extractors` and are named as follows:
 
 - `SporadicExtractor`
 - `DeltaMinExtractor`, `DeltaMinHiExtractor`, and `DeltaMinLoExtractor`
 - `DeltaMaxExtractor`, `DeltaMaxHiExtractor`, and `DeltaMaxLoExtractor`
 - `PeriodicExtractor`, `CertainFitPeriodicExtractor`, and `PossibleFitPeriodicExtractor`
+- `MaxResourceUseExtractor`
 
 ## Attribution
 
@@ -237,6 +242,40 @@ assert ex_dmax_lo.current_model == dmax_lo
 
 The above examples are all checked in `tests/test_examples.py`. See also the other unit tests for further usage examples.
 
+### Resource-Use Model Inference
+
+Resource-use inference consumes a sequence of per-job resource-consumption observations, such as execution times. The values are discrete integer amounts represented by `ResourceAmount`, which is an alias of `int`.
+
+```python
+from rt_model_inference import ResourceAmount, infer_max_resource_use
+
+OBSERVATIONS: list[ResourceAmount] = [3, 1, 4, 1, 5]
+
+moru = infer_max_resource_use(OBSERVATIONS)
+assert moru == [0, 5, 6, 10, 11, 14]
+```
+
+The returned vector `moru` has one entry per window size: `moru[n]` is the maximum cumulative resource use observed across any `n` consecutive jobs. In the example, the largest single-job resource use is `5`, and the largest cumulative use across two consecutive jobs is `6`.
+
+The optional `nmax` parameter limits the largest consecutive-job count included in the result:
+
+```python
+assert infer_max_resource_use(OBSERVATIONS, nmax=3) == [0, 5, 6, 10]
+```
+
+The corresponding streaming extractor is `MaxResourceUseExtractor`:
+
+```python
+from rt_model_inference.extractors import MaxResourceUseExtractor
+
+ex_resource = MaxResourceUseExtractor(nmax=3)
+ex_resource.feed(OBSERVATIONS[:2])
+assert ex_resource.current_model == [0, 3, 4]
+
+ex_resource.feed(OBSERVATIONS[2:])
+assert ex_resource.current_model == [0, 5, 6, 10]
+```
+
 ## Development
 
 We recommend using the [`uv` package manager for Python](https://docs.astral.sh/uv/).
@@ -259,10 +298,12 @@ To run the CLI, use the standard module entry point:
 uv run python -m rt_model_inference --help
 ```
 
-The CLI reads release times from stdin by default (or from a file path argument):
+By default, the CLI performs release-time arrival-model inference. The CLI reads release times from stdin by default (or from a file path argument):
 
 - if there is one number per line, the value is interpreted as a (certain) release time;
 - if there are two numbers per line, the two values are interpreted as defining an (uncertain) release window.
+
+For resource-use inference, pass `-r` / `--resource-use`. In this mode, the input is one integer resource-consumption amount per non-empty line.
 
 To exercise periodic inference with generated sample input:
 
@@ -293,6 +334,13 @@ awk -F, '{print $2 " " $3}'  tests/traces/sporadic/cpp-ar-mixed_20task_u90_mu22_
 ```bash
 awk -F, '{print $2 " " $3}'  tests/traces/sporadic/cpp-ar-mixed_20task_u90_mu22_ms_v22_task=05.csv | uv run python -m rt_model_inference -m delta-max-lo --n-max 10 --stream 25
 ```
+
+Extract a resource-use model:
+
+```bash
+seq 100 | sort -R |  uv run python -m rt_model_inference --resource-use --n-max 10 --json
+```
+
 
 ### Run the Tests
 
