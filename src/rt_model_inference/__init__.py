@@ -7,7 +7,7 @@ from .certain_sporadic import (
     max_releases,
     min_releases,
 )
-from .resource_use import ResourceAmount, infer_max_resource_use
+from .resource_use import ResourceAmount, infer_max_resource_use, infer_min_resource_use
 from .uncertain_periodic import (
     infer_certain_fit_periodic_model,
     infer_possible_fit_periodic_model,
@@ -26,6 +26,7 @@ __all__ = [
     "infer_possible_fit_periodic_model",
     "ResourceAmount",
     "infer_max_resource_use",
+    "infer_min_resource_use",
     "min_releases",
     "max_releases",
     "infer_delta_max",

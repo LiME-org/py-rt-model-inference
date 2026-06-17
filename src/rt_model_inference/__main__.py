@@ -18,6 +18,7 @@ from rt_model_inference.extractors import (
     DeltaMinHiExtractor,
     DeltaMinLoExtractor,
     MaxResourceUseExtractor,
+    MinResourceUseExtractor,
     PeriodicExtractor,
     PossibleFitPeriodicExtractor,
     SporadicExtractor,
@@ -32,6 +33,7 @@ from . import (
     infer_delta_min_hi,
     infer_delta_min_lo,
     infer_max_resource_use,
+    infer_min_resource_use,
     infer_periodic_model,
     infer_possible_fit_periodic_model,
     infer_sporadic_model,
@@ -50,6 +52,8 @@ class ModelName(StrEnum):
     PERIODIC = "periodic"
     PERIODIC_CERTAIN_FIT = "periodic-certain-fit"
     PERIODIC_POSSIBLE_FIT = "periodic-possible-fit"
+    MAX_RESOURCE_USE = "max-resource-use"
+    MIN_RESOURCE_USE = "min-resource-use"
 
 
 MODEL_NAMES: tuple[str, ...] = tuple(model.value for model in ModelName)
@@ -78,16 +82,20 @@ def parse_cmdline(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "-m",
         "--model",
         choices=MODEL_NAMES,
-        default=ModelName.DELTA_MIN.value,
-        help="Model to infer (default: delta-min).",
+        default=None,
+        help=(
+            "Model to infer. Defaults to delta-min in release mode and "
+            "max-resource-use in resource-use mode."
+        ),
     )
     _ = parser.add_argument(
         "-r",
         "--resource-use",
         action="store_true",
         help=(
-            "Infer a maximum observed resource-use vector from one resource "
-            "consumption amount per input line."
+            "Infer a resource-use vector from one resource consumption amount "
+            "per input line. Defaults to max-resource-use unless --model is "
+            "min-resource-use."
         ),
     )
     _ = parser.add_argument(
@@ -251,13 +259,20 @@ def sporadic_model(
 
 def resource_use_model(
     observations: Iterable[int],
-    _model: ModelName,
+    model: ModelName,
     n_max: int | None,
     output_json: bool,
 ) -> str:
-    vec = infer_max_resource_use(observations, nmax=n_max)
+    if model == ModelName.MAX_RESOURCE_USE:
+        model_name = "maximum cumulative resource use"
+        vec = infer_max_resource_use(observations, nmax=n_max)
+    elif model == ModelName.MIN_RESOURCE_USE:
+        model_name = "minimum cumulative resource use"
+        vec = infer_min_resource_use(observations, nmax=n_max)
+    else:
+        raise ValueError(f"not a resource-use model: {model}")
     if output_json:
-        return json.dumps({"model": "maximum cumulative resource use", "vector": vec})
+        return json.dumps({"model": model_name, "vector": vec})
     else:
         return " ".join(str(resource_amount) for resource_amount in vec)
 
@@ -425,21 +440,28 @@ def streaming_sporadic_model(
 
 def streaming_resource_use_model(
     observations: Iterable[int],
-    _model: ModelName,
+    model: ModelName,
     n_max: int | None,
     output_json: bool,
     output_every: int,
 ) -> Iterator[str]:
+    if model == ModelName.MAX_RESOURCE_USE:
+        model_name = "maximum cumulative resource use"
+        extractor = MaxResourceUseExtractor
+    elif model == ModelName.MIN_RESOURCE_USE:
+        model_name = "minimum cumulative resource use"
+        extractor = MinResourceUseExtractor
+    else:
+        raise ValueError(f"not a resource-use model: {model}")
+
     @no_type_check
     def as_str(vec):
         if output_json:
-            return json.dumps(
-                {"model": "maximum cumulative resource use", "vector": vec}
-            )
+            return json.dumps({"model": model_name, "vector": vec})
         else:
             return " ".join(str(resource_amount) for resource_amount in vec)
 
-    ex = MaxResourceUseExtractor(nmax=n_max)
+    ex = extractor(nmax=n_max)
     first = True
     if output_json:
         yield "["
@@ -483,12 +505,23 @@ STREAMING_INFERENCE_ALGORITHMS = {
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_cmdline(argv)
-    model = ModelName(cast(str, args.model))
+    resource_use_flag = cast(bool, args.resource_use)
+    raw_model = cast(str | None, args.model)
+    model = (
+        ModelName(raw_model)
+        if raw_model is not None
+        else ModelName.MAX_RESOURCE_USE
+        if resource_use_flag
+        else ModelName.DELTA_MIN
+    )
+    resource_use = resource_use_flag or model in (
+        ModelName.MAX_RESOURCE_USE,
+        ModelName.MIN_RESOURCE_USE,
+    )
     input_path = cast(str, args.input)
     n_max = cast(int | None, args.n_max)
     stream = cast(int | None, args.stream)
     output_json = cast(bool, args.json)
-    resource_use = cast(bool, args.resource_use)
 
     input_stream = sys.stdin
     if input_path != "-":

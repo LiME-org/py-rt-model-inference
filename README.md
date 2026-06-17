@@ -23,6 +23,7 @@ For _uncertain_ release windows:
 For per-job resource-consumption observations:
 
 - `infer_max_resource_use`: infer a vector that upper-bounds the maximum cumulative resource use of consecutive jobs.
+- `infer_min_resource_use`: infer a vector that lower-bounds the minimum cumulative resource use of consecutive jobs.
 
 The above-mentioned APIs are "one-shot" procedures, consuming all given input in one go and producing a model as a result. Additionally, the library provides _streaming extractor_ variants of all these algorithms, which consume input continuously and can be queried at any time to obtain the model inferred _so far_. The streaming extractor classes can be imported from `rt_model_inference.extractors` and are named as follows:
 
@@ -30,7 +31,7 @@ The above-mentioned APIs are "one-shot" procedures, consuming all given input in
 - `DeltaMinExtractor`, `DeltaMinHiExtractor`, and `DeltaMinLoExtractor`
 - `DeltaMaxExtractor`, `DeltaMaxHiExtractor`, and `DeltaMaxLoExtractor`
 - `PeriodicExtractor`, `CertainFitPeriodicExtractor`, and `PossibleFitPeriodicExtractor`
-- `MaxResourceUseExtractor`
+- `MaxResourceUseExtractor` and `MinResourceUseExtractor`
 
 ## Attribution
 
@@ -247,26 +248,30 @@ The above examples are all checked in `tests/test_examples.py`. See also the oth
 Resource-use inference consumes a sequence of per-job resource-consumption observations, such as execution times. The values are discrete integer amounts represented by `ResourceAmount`, which is an alias of `int`.
 
 ```python
-from rt_model_inference import ResourceAmount, infer_max_resource_use
+from rt_model_inference import ResourceAmount, infer_max_resource_use, infer_min_resource_use
 
 OBSERVATIONS: list[ResourceAmount] = [3, 1, 4, 1, 5]
 
-moru = infer_max_resource_use(OBSERVATIONS)
-assert moru == [0, 5, 6, 10, 11, 14]
+max_ru = infer_max_resource_use(OBSERVATIONS)
+assert max_ru == [0, 5, 6, 10, 11, 14]
+
+min_ru = infer_min_resource_use(OBSERVATIONS)
+assert min_ru == [0, 1, 4, 6, 9, 14]
 ```
 
-The returned vector `moru` has one entry per window size: `moru[n]` is the maximum cumulative resource use observed across any `n` consecutive jobs. In the example, the largest single-job resource use is `5`, and the largest cumulative use across two consecutive jobs is `6`.
+The returned vectors have one entry per window size: `max_ru[n]` is the maximum cumulative resource use observed across any `n` consecutive jobs, and `min_ru[n]` is the corresponding minimum. In the example, the largest single-job resource use is `5`, the smallest single-job resource use is `1`, and both the maximum and minimum cumulative use across all five jobs is `14`.
 
 The optional `nmax` parameter limits the largest consecutive-job count included in the result:
 
 ```python
 assert infer_max_resource_use(OBSERVATIONS, nmax=3) == [0, 5, 6, 10]
+assert infer_min_resource_use(OBSERVATIONS, nmax=3) == [0, 1, 4, 6]
 ```
 
-The corresponding streaming extractor is `MaxResourceUseExtractor`:
+The corresponding streaming extractors are `MaxResourceUseExtractor` and `MinResourceUseExtractor`:
 
 ```python
-from rt_model_inference.extractors import MaxResourceUseExtractor
+from rt_model_inference.extractors import MaxResourceUseExtractor, MinResourceUseExtractor
 
 ex_resource = MaxResourceUseExtractor(nmax=3)
 ex_resource.feed(OBSERVATIONS[:2])
@@ -274,6 +279,13 @@ assert ex_resource.current_model == [0, 3, 4]
 
 ex_resource.feed(OBSERVATIONS[2:])
 assert ex_resource.current_model == [0, 5, 6, 10]
+
+ex_min_resource = MinResourceUseExtractor(nmax=3)
+ex_min_resource.feed(OBSERVATIONS[:2])
+assert ex_min_resource.current_model == [0, 1, 4]
+
+ex_min_resource.feed(OBSERVATIONS[2:])
+assert ex_min_resource.current_model == [0, 1, 4, 6]
 ```
 
 ## Development
@@ -303,7 +315,7 @@ By default, the CLI performs release-time arrival-model inference. The CLI reads
 - if there is one number per line, the value is interpreted as a (certain) release time;
 - if there are two numbers per line, the two values are interpreted as defining an (uncertain) release window.
 
-For resource-use inference, pass `-r` / `--resource-use`. In this mode, the input is one integer resource-consumption amount per non-empty line.
+For resource-use inference, pass `-r` / `--resource-use` or select a resource-use model with `-m max-resource-use` or `-m min-resource-use`. In this mode, the input is one integer resource-consumption amount per non-empty line. The default resource-use model with `-r` is `max-resource-use`.
 
 To exercise periodic inference with generated sample input:
 
@@ -335,10 +347,14 @@ awk -F, '{print $2 " " $3}'  tests/traces/sporadic/cpp-ar-mixed_20task_u90_mu22_
 awk -F, '{print $2 " " $3}'  tests/traces/sporadic/cpp-ar-mixed_20task_u90_mu22_ms_v22_task=05.csv | uv run python -m rt_model_inference -m delta-max-lo --n-max 10 --stream 25
 ```
 
-Extract a resource-use model:
+Extract resource-use models:
 
 ```bash
 seq 100 | sort -R |  uv run python -m rt_model_inference --resource-use --n-max 10 --json
+```
+
+```bash
+seq 100 | sort -R |  uv run python -m rt_model_inference --resource-use -m min-resource-use --n-max 10 --json
 ```
 
 
