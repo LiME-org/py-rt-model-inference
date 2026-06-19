@@ -29,6 +29,8 @@ def infer_max_resource_use(
     buffer: deque[ResourceAmount] = deque(maxlen=nmax)
 
     for observation_i in observations:
+        if observation_i < 0:
+            raise ValueError("resource-use observations must be non-negative")
         buffer.append(observation_i)
         total = 0
         for n_observations, observation in enumerate(reversed(buffer), start=1):
@@ -67,6 +69,8 @@ def infer_min_resource_use(
     buffer: deque[ResourceAmount] = deque(maxlen=nmax)
 
     for observation_i in observations:
+        if observation_i < 0:
+            raise ValueError("resource-use observations must be non-negative")
         buffer.append(observation_i)
         total = 0
         for n_observations, observation in enumerate(reversed(buffer), start=1):

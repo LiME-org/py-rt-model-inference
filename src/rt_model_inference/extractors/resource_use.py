@@ -18,6 +18,8 @@ class MaxResourceUseExtractor:
     def feed(self, observations: Iterable[ResourceAmount]) -> None:
         "Update the current model estimate based on newly observed resource use."
         for observation_i in observations:
+            if observation_i < 0:
+                raise ValueError("resource-use observations must be non-negative")
             self._buffer.append(observation_i)
             total = 0
             for n_observations, observation in enumerate(
@@ -54,6 +56,8 @@ class MinResourceUseExtractor:
     def feed(self, observations: Iterable[ResourceAmount]) -> None:
         "Update the current model estimate based on newly observed resource use."
         for observation_i in observations:
+            if observation_i < 0:
+                raise ValueError("resource-use observations must be non-negative")
             self._buffer.append(observation_i)
             total = 0
             for n_observations, observation in enumerate(

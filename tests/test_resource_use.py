@@ -129,6 +129,16 @@ def test_infer_minimum_observed_resource_use_rejects_invalid_nmax() -> None:
         _ = infer_min_resource_use([1, 2, 3], nmax=0)
 
 
+def test_infer_maximum_observed_resource_use_rejects_negative_observations() -> None:
+    with pytest.raises(ValueError, match="resource-use observations must be non-negative"):
+        _ = infer_max_resource_use([1, -1, 3])
+
+
+def test_infer_minimum_observed_resource_use_rejects_negative_observations() -> None:
+    with pytest.raises(ValueError, match="resource-use observations must be non-negative"):
+        _ = infer_min_resource_use([1, -1, 3])
+
+
 @pytest.mark.parametrize("seed", [*SEEDS])
 @pytest.mark.parametrize("nmax", [None, 1, 7, 32])
 @pytest.mark.parametrize("num_chunks", [2, 5, 100])
@@ -179,3 +189,21 @@ def test_maximum_observed_resource_use_extractor_rejects_invalid_nmax() -> None:
 def test_minimum_observed_resource_use_extractor_rejects_invalid_nmax() -> None:
     with pytest.raises(ValueError, match="nmax must be positive"):
         _ = MinResourceUseExtractor(nmax=0)
+
+
+def test_maximum_observed_resource_use_extractor_rejects_negative_observations() -> None:
+    extractor = MaxResourceUseExtractor()
+
+    with pytest.raises(ValueError, match="resource-use observations must be non-negative"):
+        extractor.feed([-1])
+
+    assert extractor.current_model == []
+
+
+def test_minimum_observed_resource_use_extractor_rejects_negative_observations() -> None:
+    extractor = MinResourceUseExtractor()
+
+    with pytest.raises(ValueError, match="resource-use observations must be non-negative"):
+        extractor.feed([-1])
+
+    assert extractor.current_model == []
