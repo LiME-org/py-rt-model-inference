@@ -25,6 +25,11 @@ For per-job resource-consumption observations:
 - `infer_max_resource_use`: infer a vector that upper-bounds the maximum cumulative resource use of consecutive jobs.
 - `infer_min_resource_use`: infer a vector that lower-bounds the minimum cumulative resource use of consecutive jobs.
 
+For per-job self-suspension observations:
+
+- `infer_max_suspension_model`: infer a vector that over-approximates the cumulative self-suspension behavior of consecutive jobs.
+- `infer_min_suspension_model`: infer a vector that under-approximates the cumulative self-suspension behavior of consecutive jobs.
+
 The above-mentioned APIs are "one-shot" procedures, consuming all given input in one go and producing a model as a result. Additionally, the library provides _streaming extractor_ variants of all these algorithms, which consume input continuously and can be queried at any time to obtain the model inferred _so far_. The streaming extractor classes can be imported from `rt_model_inference.extractors` and are named as follows:
 
 - `SporadicExtractor`
@@ -32,6 +37,7 @@ The above-mentioned APIs are "one-shot" procedures, consuming all given input in
 - `DeltaMaxExtractor`, `DeltaMaxHiExtractor`, and `DeltaMaxLoExtractor`
 - `PeriodicExtractor`, `CertainFitPeriodicExtractor`, and `PossibleFitPeriodicExtractor`
 - `MaxResourceUseExtractor` and `MinResourceUseExtractor`
+- `MaxSuspensionModelExtractor` and `MinSuspensionModelExtractor`
 
 ## Attribution
 
@@ -287,6 +293,40 @@ assert ex_min_resource.current_model == [0, 1, 4]
 ex_min_resource.feed(OBSERVATIONS[2:])
 assert ex_min_resource.current_model == [0, 1, 4, 6]
 ```
+
+### Self-Suspension Model Inference
+
+Self-suspension inference consumes per-job `BasicJobSuspensionBehavior` observations. Each observation is represented as a `(number_of_suspensions, cumulative_duration)` tuple, where `number_of_suspensions` is the number of times a job self-suspended and `cumulative_duration` is the total duration of all self-suspensions of the same job.
+
+The inferred model is a vector of `BasicSuspensionModel` entries, with one entry per consecutive-job count.
+
+```python
+from rt_model_inference import (
+    BasicJobSuspensionBehavior,
+    infer_max_suspension_model,
+    infer_min_suspension_model,
+)
+
+SUSPENSIONS: list[BasicJobSuspensionBehavior] = [
+    (3, 10),
+    (1, 2),
+    (4, 8),
+    (1, 5),
+    (5, 6),
+]
+
+max_suspensions = infer_max_suspension_model(SUSPENSIONS, nmax=3)
+assert max_suspensions[1].number_of_suspensions == 5
+assert max_suspensions[1].cumulative_duration == 10
+
+min_suspensions = infer_min_suspension_model(SUSPENSIONS, nmax=3)
+assert min_suspensions[1].number_of_suspensions == 1
+assert min_suspensions[1].cumulative_duration == 2
+```
+
+Here, `max_suspensions[n]` component-wise upper-bounds the suspension count and cumulative self-suspension duration observed across any `n` consecutive jobs; `min_suspensions[n]` lower-bounds them. The optional `nmax` parameter limits the largest consecutive-job count included in the result.
+
+The corresponding streaming extractors are `MaxSuspensionModelExtractor` and `MinSuspensionModelExtractor`.
 
 ## Development
 

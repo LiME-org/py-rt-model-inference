@@ -8,6 +8,12 @@ from .certain_sporadic import (
     min_releases,
 )
 from .resource_use import ResourceAmount, infer_max_resource_use, infer_min_resource_use
+from .suspension import (
+    BasicJobSuspensionBehavior,
+    BasicSuspensionModel,
+    infer_max_suspension_model,
+    infer_min_suspension_model,
+)
 from .uncertain_periodic import (
     infer_certain_fit_periodic_model,
     infer_possible_fit_periodic_model,
@@ -27,6 +33,10 @@ __all__ = [
     "ResourceAmount",
     "infer_max_resource_use",
     "infer_min_resource_use",
+    "BasicSuspensionModel",
+    "BasicJobSuspensionBehavior",
+    "infer_max_suspension_model",
+    "infer_min_suspension_model",
     "min_releases",
     "max_releases",
     "infer_delta_max",
