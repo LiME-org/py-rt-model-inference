@@ -31,9 +31,7 @@ def dmin_curve_is_tight(dmin: list[Duration], releases: Sequence[Instant]) -> bo
     if not releases:
         return True
     for n, delta in enumerate(dmin):
-        if n == 0 and delta != 0:
-            return False
-        elif n == 1 and delta != 1:
+        if n == 0 and delta != 0 or n == 1 and delta != 1:
             return False
         elif n > 1:
             witness = find_closed_interval_containing(releases, delta, n)

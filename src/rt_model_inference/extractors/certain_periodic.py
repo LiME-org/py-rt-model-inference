@@ -85,11 +85,11 @@ class PeriodicExtractor:
         # update candidates
         dmc = derived_model_candidates(
             batch_last_processed_index(batch, self._overlap),
-            int(round(running_mean)),
+            round(running_mean),
             min_jitter_model.period,
             self._candidates,
         )
-        candidates = set(batch_update(batch, mc) for mc in chain(self._candidates, dmc))
+        candidates = {batch_update(batch, mc) for mc in chain(self._candidates, dmc)}
 
         # prune candidates
         best = min(candidates, key=lambda m: m.jitter)

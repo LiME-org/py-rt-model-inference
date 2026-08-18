@@ -1,9 +1,8 @@
 """Inference of periodic models with offset and jitter from sequences of uncertain release-time windows."""
 
 from collections.abc import Iterable, Sequence
-from itertools import chain
+from itertools import chain, pairwise
 from math import ceil, floor
-from typing import TypeAlias
 
 from rt_model_inference.certain_periodic import (
     PeriodicModel,
@@ -21,7 +20,7 @@ from .iterators import (
 )
 from .time import Duration, Instant, ReleaseWindow
 
-Batch: TypeAlias = tuple[tuple[int, ReleaseWindow], ...]
+Batch = tuple[tuple[int, ReleaseWindow], ...]
 
 # symbolic constants for release-window tuples
 LOWER = 0
@@ -37,12 +36,12 @@ def batch_last_processed_index(
 
 def batch_gaps(batch: Batch) -> list[Duration]:
     # consider the separation between release-window upper bounds
-    return list(w2[UPPER] - w1[UPPER] for (_, w1), (_, w2) in zip(batch, batch[1:]))
+    return [w2[UPPER] - w1[UPPER] for (_, w1), (_, w2) in pairwise(batch)]
 
 
 def batch_mean_gap(batch: Batch) -> float:
     if len(batch) > 1:
-        total = sum(w2[UPPER] - w1[UPPER] for (_, w1), (_, w2) in zip(batch, batch[1:]))
+        total = sum(w2[UPPER] - w1[UPPER] for (_, w1), (_, w2) in pairwise(batch))
         return total / (len(batch) - 1)
     else:
         return 0
@@ -81,8 +80,8 @@ def certain_fit_batch_min_jitter_model(
 ) -> PeriodicModel:
 
     mg = batch_mean_gap(batch)
-    lo = int(floor(mg * search_range[0]))
-    hi = int(ceil(mg * search_range[1]))
+    lo = floor(mg * search_range[0])
+    hi = ceil(mg * search_range[1])
 
     opt = None
     while hi - lo > 1:
@@ -100,7 +99,7 @@ def certain_fit_batch_min_jitter_model(
             lo = mid
             opt = m_hi
 
-    return opt if opt is not None else certain_fit_batch_model(batch, int(round(mg)))
+    return opt if opt is not None else certain_fit_batch_model(batch, round(mg))
 
 
 def certain_fit_batch_update(batch: Batch, mc_old: PeriodicModel) -> PeriodicModel:
@@ -175,16 +174,16 @@ def infer_certain_fit_periodic_model(
             # Derive some new model candidates.
             dmc = derived_model_candidates(
                 batch_last_processed_index(batch, overlap),
-                int(round(running_mean)),
+                round(running_mean),
                 min_jitter_model.period,
                 model_candidates,
             )
 
             # Update all model candidates.
-            updated_candidates = set(
+            updated_candidates = {
                 certain_fit_batch_update(batch, mc)
                 for mc in chain(model_candidates, dmc)
-            )
+            }
 
             # Finally, prune any candidates that have diverged too much from
             # the best-so-far solution.
@@ -242,8 +241,8 @@ def possible_fit_batch_min_jitter_model(
 ) -> PeriodicModel:
 
     mg = batch_mean_gap(batch)
-    lo = int(floor(mg * search_range[0]))
-    hi = int(ceil(mg * search_range[1]))
+    lo = floor(mg * search_range[0])
+    hi = ceil(mg * search_range[1])
 
     opt = None
     while hi - lo > 1:
@@ -261,7 +260,7 @@ def possible_fit_batch_min_jitter_model(
             lo = mid
             opt = m_hi
 
-    return opt if opt is not None else possible_fit_batch_model(batch, int(round(mg)))
+    return opt if opt is not None else possible_fit_batch_model(batch, round(mg))
 
 
 def possible_fit_batch_update(batch: Batch, mc_old: PeriodicModel) -> PeriodicModel:
@@ -337,16 +336,16 @@ def infer_possible_fit_periodic_model(
             # Derive some new model candidates.
             dmc = derived_model_candidates(
                 batch_last_processed_index(batch, overlap),
-                int(round(running_mean)),
+                round(running_mean),
                 min_jitter_model.period,
                 model_candidates,
             )
 
             # Update all model candidates.
-            updated_candidates = set(
+            updated_candidates = {
                 possible_fit_batch_update(batch, mc)
                 for mc in chain(model_candidates, dmc)
-            )
+            }
 
             # Finally, prune any candidates that have diverged too much from
             # the best-so-far solution with a non-trivial jitter bound.

@@ -41,6 +41,8 @@ __all__ = [
     "Segment",
     "SegmentedJobSuspensionBehavior",
     "SegmentedSuspensionModel",
+    "basic_from_segmented_model",
+    "basic_from_segmented_observation",
     "infer_certain_fit_periodic_model",
     "infer_delta_max",
     "infer_delta_max_hi",
@@ -58,7 +60,5 @@ __all__ = [
     "infer_sporadic_model",
     "max_releases",
     "min_releases",
-    "basic_from_segmented_observation",
-    "basic_from_segmented_model",
     "time",
 ]

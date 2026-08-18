@@ -62,8 +62,8 @@ def test_sporadic_model_inference_on_sporadic_trace_file(
     releases_and_windows = load_release_trace(TRACE_DIR / trace_file_name)
     if cutoff is not None:
         releases_and_windows = releases_and_windows[:cutoff]
-    releases = list((r for r, _ in releases_and_windows))
-    windows = list((w for _, w in releases_and_windows))
+    releases = [r for r, _ in releases_and_windows]
+    windows = [w for _, w in releases_and_windows]
 
     dmin = infer_delta_min(releases, nmax=nmax)
     dmax = infer_delta_max(releases, nmax=nmax)
@@ -124,8 +124,8 @@ def test_periodic_model_inference_on_sporadic_trace_file(trace_file_name: str):
 
     # As these traces are not periodic, this tests mainly model divergence.
     releases_and_windows = load_release_trace(TRACE_DIR / trace_file_name)
-    releases = list((r for r, _ in releases_and_windows))
-    windows = list((w for _, w in releases_and_windows))
+    releases = [r for r, _ in releases_and_windows]
+    windows = [w for _, w in releases_and_windows]
 
     BS = 128
     exact = infer_periodic_model(releases, batch_size=BS)

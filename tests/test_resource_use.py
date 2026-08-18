@@ -8,7 +8,10 @@ from rt_model_inference import (
     infer_max_resource_use,
     infer_min_resource_use,
 )
-from rt_model_inference.extractors import MaxResourceUseExtractor, MinResourceUseExtractor
+from rt_model_inference.extractors import (
+    MaxResourceUseExtractor,
+    MinResourceUseExtractor,
+)
 
 
 def test_infer_maximum_observed_resource_use() -> None:

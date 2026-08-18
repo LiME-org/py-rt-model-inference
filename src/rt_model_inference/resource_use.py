@@ -2,9 +2,8 @@
 
 from collections import deque
 from collections.abc import Iterable
-from typing import TypeAlias
 
-ResourceAmount: TypeAlias = int
+ResourceAmount = int
 
 
 def infer_max_resource_use(

@@ -1,9 +1,9 @@
 """Inference of periodic models with offset and jitter from sequences of certain release times."""
 
 from collections.abc import Iterable, Iterator, Sequence
-from itertools import chain
+from itertools import chain, pairwise
 from math import ceil, floor
-from typing import NamedTuple, TypeAlias
+from typing import NamedTuple
 
 from .iterators import (
     evenly_spaced_around,
@@ -20,7 +20,7 @@ class PeriodicModel(NamedTuple):
     jitter: Duration
 
 
-Batch: TypeAlias = tuple[tuple[int, Instant], ...]
+Batch = tuple[tuple[int, Instant], ...]
 
 
 def validate_periodic_tunables(
@@ -72,12 +72,12 @@ def batch_last_processed_index(
 
 
 def batch_gaps(batch: Batch) -> list[Duration]:
-    return list(r2 - r1 for (_, r1), (_, r2) in zip(batch, batch[1:]))
+    return [r2 - r1 for (_, r1), (_, r2) in pairwise(batch)]
 
 
 def batch_mean_gap(batch: Batch) -> float:
     if len(batch) > 1:
-        total = sum(r2 - r1 for (_, r1), (_, r2) in zip(batch, batch[1:]))
+        total = sum(r2 - r1 for (_, r1), (_, r2) in pairwise(batch))
         return total / (len(batch) - 1)
     else:
         return 0
@@ -109,8 +109,8 @@ def batch_min_jitter_model(
 ) -> PeriodicModel:
 
     mg = batch_mean_gap(batch)
-    lo = int(floor(mg * search_range[0]))
-    hi = int(ceil(mg * search_range[1]))
+    lo = floor(mg * search_range[0])
+    hi = ceil(mg * search_range[1])
 
     opt = None
     while hi - lo > 1:
@@ -128,7 +128,7 @@ def batch_min_jitter_model(
             lo = mid
             opt = m_hi
 
-    return opt if opt is not None else batch_model(batch, int(round(mg)))
+    return opt if opt is not None else batch_model(batch, round(mg))
 
 
 def spaced_period_candidates(
@@ -138,7 +138,7 @@ def spaced_period_candidates(
 ) -> Iterator[Duration]:
     extension = candidate_dispersion * min_jitter_model.jitter
     return (
-        int(round(p))
+        round(p)
         for p in evenly_spaced_around(min_jitter_model.period, extension, n_candidates)
         if round(p) > 0
     )
@@ -185,7 +185,7 @@ def derived_model_candidates(
     min_jitter_period: Duration,
     model_candidates: Sequence[PeriodicModel],
 ) -> Iterator[PeriodicModel]:
-    for ref_period in set((running_mean_period, min_jitter_period)):
+    for ref_period in {running_mean_period, min_jitter_period}:
         mc_star = min(model_candidates, key=lambda m: abs(m.period - ref_period))
         if mc_star.period < ref_period:
             offset_new = mc_star.offset + last_processed_idx * (
@@ -269,15 +269,15 @@ def infer_periodic_model(
             # Derive some new model candidates.
             dmc = derived_model_candidates(
                 batch_last_processed_index(batch, overlap),
-                int(round(running_mean)),
+                round(running_mean),
                 min_jitter_model.period,
                 model_candidates,
             )
 
             # Update all model candidates.
-            updated_candidates = set(
+            updated_candidates = {
                 batch_update(batch, mc) for mc in chain(model_candidates, dmc)
-            )
+            }
 
             # Finally, prune any candidates that have diverged too much from
             # the best-so-far solution.

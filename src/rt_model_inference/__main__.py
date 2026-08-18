@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from collections.abc import Iterable, Iterator, Sequence
+from contextlib import ExitStack
 from enum import StrEnum
 from functools import partial
 from itertools import batched
@@ -523,57 +524,65 @@ def main(argv: Sequence[str] | None = None) -> int:
     stream = cast(int | None, args.stream)
     output_json = cast(bool, args.json)
 
-    input_stream = sys.stdin
-    if input_path != "-":
-        try:
-            input_stream = open(input_path, "r", encoding="utf-8")
-        except OSError as exc:
-            print(
-                f"error: unable to open input file {input_path!r}: {exc}",
-                file=sys.stderr,
-            )
-            return 2
-
-    try:
-        if resource_use:
-            observations = parse_resource_amounts(input_stream)
-            if stream is not None:
-                for output in streaming_resource_use_model(
-                    observations,
-                    model,
-                    n_max,
-                    output_json,
-                    stream,
-                ):
-                    print(output)
-            else:
-                print(resource_use_model(observations, model, n_max, output_json))
-        elif stream is not None:
-            if model in STREAMING_INFERENCE_ALGORITHMS:
-                alg = STREAMING_INFERENCE_ALGORITHMS[model]
-                for output in alg(
-                    parse_release_windows(input_stream),
-                    model,
-                    n_max,
-                    output_json,
-                    stream,
-                ):
-                    print(output)
-            else:
-                print(f"unsupported streaming model: {model}", file=sys.stderr)
-                return 3
-        else:
-            if model in INFERENCE_ALGORITHMS:
-                alg = INFERENCE_ALGORITHMS[model]
-                print(
-                    alg(parse_release_windows(input_stream), model, n_max, output_json)
+    with ExitStack() as stack:
+        input_stream = sys.stdin
+        if input_path != "-":
+            try:
+                input_stream = stack.enter_context(
+                    open(input_path, "r", encoding="utf-8")
                 )
+            except OSError as exc:
+                print(
+                    f"error: unable to open input file {input_path!r}: {exc}",
+                    file=sys.stderr,
+                )
+                return 2
+
+        try:
+            if resource_use:
+                observations = parse_resource_amounts(input_stream)
+                if stream is not None:
+                    for output in streaming_resource_use_model(
+                        observations,
+                        model,
+                        n_max,
+                        output_json,
+                        stream,
+                    ):
+                        print(output)
+                else:
+                    print(resource_use_model(observations, model, n_max, output_json))
+            elif stream is not None:
+                if model in STREAMING_INFERENCE_ALGORITHMS:
+                    alg = STREAMING_INFERENCE_ALGORITHMS[model]
+                    for output in alg(
+                        parse_release_windows(input_stream),
+                        model,
+                        n_max,
+                        output_json,
+                        stream,
+                    ):
+                        print(output)
+                else:
+                    print(f"unsupported streaming model: {model}", file=sys.stderr)
+                    return 3
             else:
-                print(f"unsupported model: {model}", file=sys.stderr)
-                return 3
-    except ValueError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
+                if model in INFERENCE_ALGORITHMS:
+                    alg = INFERENCE_ALGORITHMS[model]
+                    print(
+                        alg(
+                            parse_release_windows(input_stream),
+                            model,
+                            n_max,
+                            output_json,
+                        )
+                    )
+                else:
+                    print(f"unsupported model: {model}", file=sys.stderr)
+                    return 3
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
 
     return 0
 

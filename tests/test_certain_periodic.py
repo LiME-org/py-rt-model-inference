@@ -36,7 +36,7 @@ def test_batch_gaps_and_mean_gap() -> None:
 
 
 def test_batch_mean_gap_for_empty_and_singleton_batches() -> None:
-    assert batch_mean_gap(tuple()) == 0
+    assert batch_mean_gap(()) == 0
     assert batch_mean_gap(((0, 42),)) == 0
 
 

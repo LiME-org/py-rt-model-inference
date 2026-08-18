@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Iterator
 from itertools import tee, zip_longest
-from typing import NamedTuple, TypeAlias
+from typing import NamedTuple
 
 from rt_model_inference.resource_use import (
     infer_max_resource_use,
@@ -11,11 +11,11 @@ from rt_model_inference.time import Duration
 # Every job is characterized by
 # (1) the number of times it self-suspended, and
 # (2) the total duration of self-suspension.
-BasicJobSuspensionBehavior: TypeAlias = tuple[int, Duration]
+BasicJobSuspensionBehavior = tuple[int, Duration]
 
 # A job's execution can be understood as a list of observed segments ("suspension time", "execution time")
-ObservedSegment: TypeAlias = tuple[Duration, Duration]
-SegmentedJobSuspensionBehavior: TypeAlias = list[ObservedSegment]
+ObservedSegment = tuple[Duration, Duration]
+SegmentedJobSuspensionBehavior = list[ObservedSegment]
 
 
 def basic_from_segmented_observation(
@@ -26,7 +26,7 @@ def basic_from_segmented_observation(
         # special case: first segment has nonzero self-suspension time <=> release jitter
         # Release jitter counts against the total self-suspension time, but is not counted
         # as a _separate_ self-suspension because it occurs before the job starts execution.
-        return (len(segments) - 1, sum((s[0] for s in segments)))
+        return (len(segments) - 1, sum(s[0] for s in segments))
     else:
         return (0, 0)
 
@@ -86,7 +86,7 @@ class Segment(NamedTuple):
 
 
 # The segmented suspension model is simply a vector of segments.
-SegmentedSuspensionModel: TypeAlias = list[Segment]
+SegmentedSuspensionModel = list[Segment]
 
 
 def basic_from_segmented_model(
@@ -98,7 +98,7 @@ def basic_from_segmented_model(
         # Release jitter counts against the total self-suspension time, but is not counted
         # as a _separate_ self-suspension because it occurs before the job starts execution.
         return BasicSuspensionModel(
-            len(model) - 1, sum((s.max_suspension_time for s in model))
+            len(model) - 1, sum(s.max_suspension_time for s in model)
         )
     else:
         return BasicSuspensionModel(0, 0)

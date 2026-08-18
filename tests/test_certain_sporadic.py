@@ -1,6 +1,6 @@
 import random
 from bisect import bisect_left, bisect_right
-from itertools import batched
+from itertools import batched, pairwise
 
 import pytest
 
@@ -267,7 +267,7 @@ for seed in SEEDS:
         RELEASES.append(releases)
 RELEASES.sort()
 
-for a, b in zip(RELEASES, RELEASES[1:]):
+for a, b in pairwise(RELEASES):
     if a == b:
         assert False, f"duplicate: {a}"
 

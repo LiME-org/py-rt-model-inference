@@ -1,14 +1,11 @@
 from collections.abc import Iterable, Iterator, Sequence
-from itertools import accumulate
+from itertools import accumulate, pairwise
 from statistics import median
-from typing import TypeVar
 
 from rt_model_inference.time import Duration
 
-T = TypeVar("T")
 
-
-def obatched(
+def obatched[T](
     it: Iterable[T], batch_size: int, overlap: int = 1
 ) -> Iterable[tuple[T, ...]]:
     """Similarly to `batched` from the `itertools` module,
@@ -95,7 +92,7 @@ def first_and_last_nonoutlier(
 
 def is_monotonic(releases: Sequence[Duration]) -> bool:
     "Check whether the given sequence is monotonic."
-    return all(x <= y for x, y in zip(releases, releases[1:]))
+    return all(x <= y for x, y in pairwise(releases))
 
 
 def monotonic(values: Iterable[int]) -> Iterator[int]:
@@ -113,7 +110,7 @@ def evenly_spaced_around(center: float, extension: float, n: int) -> Iterator[fl
         yield lo + spread * float(k) / (n - 2)
 
 
-def is_empty(it: Iterable[T]) -> bool:
+def is_empty[T](it: Iterable[T]) -> bool:
     try:
         _ = next(iter(it))
         return False
