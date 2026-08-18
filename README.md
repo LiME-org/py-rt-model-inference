@@ -29,6 +29,7 @@ For per-job self-suspension observations:
 
 - `infer_max_suspension_model`: infer a vector that over-approximates the cumulative self-suspension behavior of consecutive jobs.
 - `infer_min_suspension_model`: infer a vector that under-approximates the cumulative self-suspension behavior of consecutive jobs.
+- `infer_segmented_suspension_model`: infer per-segment suspension- and execution-time bounds from detailed job observations.
 
 The above-mentioned APIs are "one-shot" procedures, consuming all given input in one go and producing a model as a result. Additionally, the library provides _streaming extractor_ variants of all these algorithms, which consume input continuously and can be queried at any time to obtain the model inferred _so far_. The streaming extractor classes can be imported from `rt_model_inference.extractors` and are named as follows:
 
@@ -37,18 +38,18 @@ The above-mentioned APIs are "one-shot" procedures, consuming all given input in
 - `DeltaMaxExtractor`, `DeltaMaxHiExtractor`, and `DeltaMaxLoExtractor`
 - `PeriodicExtractor`, `CertainFitPeriodicExtractor`, and `PossibleFitPeriodicExtractor`
 - `MaxResourceUseExtractor` and `MinResourceUseExtractor`
-- `MaxSuspensionModelExtractor` and `MinSuspensionModelExtractor`
+- `MaxSuspensionModelExtractor`, `MinSuspensionModelExtractor`, and `SegmentedSuspensionModelExtractor`
 
 ## Attribution
 
 When using these algorithms for academic work, please cite the following two papers:
 
-1. B. Brandenburg, C. Courtaud, F. Marković, and B. Ye, “LiME: The Linux Real-Time Task Model Extractor”, *Proceedings of the 31st IEEE Real-Time and Embedded Technology and Applications Symposium (RTAS 2025)*, May 2025.
-2. B. Ye, F. Marković, and B. Brandenburg, “Framework-Agnostic Model Inference for Intra-Thread Real-Time Tasks“, *Proceedings of the 32nd IEEE Real-Time and Embedded Technology and Applications Symposium (RTAS 2026)*, May 2026.
+1. B. Brandenburg, C. Courtaud, F. Marković, and B. Ye, “LiME: The Linux Real-Time Task Model Extractor”, _Proceedings of the 31st IEEE Real-Time and Embedded Technology and Applications Symposium (RTAS 2025)_, May 2025.
+2. B. Ye, F. Marković, and B. Brandenburg, “Framework-Agnostic Model Inference for Intra-Thread Real-Time Tasks“, _Proceedings of the 32nd IEEE Real-Time and Embedded Technology and Applications Symposium (RTAS 2026)_, May 2026.
 
 ## Usage
 
-The algorithms assume a *discrete-time model*, so all time values passed to the library must be integers. The library provides `Instant` and `Duration` in `rt_model_inference.time`, which are both aliases of `int`.
+The algorithms assume a _discrete-time model_, so all time values passed to the library must be integers. The library provides `Instant` and `Duration` in `rt_model_inference.time`, which are both aliases of `int`.
 
 ```python
 from rt_model_inference.time import Instant, Duration
@@ -118,7 +119,7 @@ assert isinstance(min_sep, Duration)
 assert min_sep == 53
 ```
 
-The functions `infer_delta_min()` and `infer_delta_max()` characterize the given release sequence with arrival curves. Arrival curves are represented as delta-min and delta-max vectors (of type `list[Duration]`). Both `infer_delta_min()` and `infer_delta_max()` take an optional keyword parameter `nmax` controlling the length of the extracted delta-min/max prefix. 
+The functions `infer_delta_min()` and `infer_delta_max()` characterize the given release sequence with arrival curves. Arrival curves are represented as delta-min and delta-max vectors (of type `list[Duration]`). Both `infer_delta_min()` and `infer_delta_max()` take an optional keyword parameter `nmax` controlling the length of the extracted delta-min/max prefix.
 
 ```python
 from rt_model_inference import infer_delta_min, infer_delta_max
@@ -132,7 +133,7 @@ assert isinstance(dmax, list) and all(isinstance(dmax[i], Duration) for i in ran
 assert dmax == [130, 223, 337, 434, 544, 638]
 ```
 
-The extracted delta-min and delta-max vectors can be interpreted with `max_releases()` and `min_releases()`, respectively. 
+The extracted delta-min and delta-max vectors can be interpreted with `max_releases()` and `min_releases()`, respectively.
 
 ```python
 from rt_model_inference import max_releases, min_releases
@@ -234,7 +235,6 @@ assert min_releases(dmax_lo, 300) == 2
 
 The extracted `delta-min-hi` vector safely over-approximates the ground-truth delta-min vector, and the extracted `delta-max-lo` vector safely under-approximates the ground-truth delta-max vector.
 
-
 The corresponding streaming extractors are `DeltaMinHiExtractor`, `DeltaMinLoExtractor`, `DeltaMaxHiExtractor` and `DeltaMaxLoExtractor`. For example:
 
 ```python
@@ -328,6 +328,28 @@ Here, `max_suspensions[n]` component-wise upper-bounds the suspension count and 
 
 The corresponding streaming extractors are `MaxSuspensionModelExtractor` and `MinSuspensionModelExtractor`.
 
+#### Segmented Suspension Models
+
+A `SegmentedJobSuspensionBehavior` records each job as `(suspension_time, execution_time)` pairs. The first suspension time represents release jitter; subsequent ones represent self-suspensions.
+
+```python
+from rt_model_inference import (
+    infer_segmented_suspension_model,
+)
+
+SEGMENTED_JOBS = [
+    [(2, 5), (3, 7)],
+    [(1, 8), (4, 6), (2, 3)],
+]
+
+segmented = infer_segmented_suspension_model(SEGMENTED_JOBS)
+assert segmented == [(2, 8), (4, 7), (2, 3)]
+```
+
+The inferred `SegmentedSuspensionModel` takes the component-wise maximum at each segment position. If any observation exceeds the optional `max_segments` limit, inference returns `None`.
+
+The corresponding streaming extractor is `SegmentedSuspensionModelExtractor`.
+
 ## Development
 
 We recommend using the [`uv` package manager for Python](https://docs.astral.sh/uv/).
@@ -397,7 +419,6 @@ seq 100 | sort -R |  uv run python -m rt_model_inference --resource-use --n-max 
 seq 100 | sort -R |  uv run python -m rt_model_inference --resource-use -m min-resource-use --n-max 10 --json
 ```
 
-
 ### Run the Tests
 
 Run the standard tests:
@@ -411,7 +432,6 @@ To run tests on all traces included in the repository, set the `TEST_ALL_TRACES`
 ```
 TEST_ALL_TRACES=1 uv run pytest -n auto
 ```
-
 
 ### Linter and Type Checking
 
@@ -430,9 +450,6 @@ uvx basedpyright
 ```
 
 Both should report no issues.
-
-
-
 
 ## License
 
