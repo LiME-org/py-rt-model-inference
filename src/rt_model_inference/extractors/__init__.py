@@ -1,3 +1,4 @@
+from .bos_suspension import BOSSuspensionModelExtractor
 from .certain_periodic import PeriodicExtractor
 from .certain_sporadic import DeltaMaxExtractor, DeltaMinExtractor, SporadicExtractor
 from .resource_use import MaxResourceUseExtractor, MinResourceUseExtractor
@@ -18,6 +19,7 @@ from .uncertain_sporadic import (
 )
 
 __all__ = [
+    "BOSSuspensionModelExtractor",
     "CertainFitPeriodicExtractor",
     "DeltaMaxExtractor",
     "DeltaMaxHiExtractor",

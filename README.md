@@ -30,6 +30,7 @@ For per-job self-suspension observations:
 - `infer_max_suspension_model`: infer a vector that over-approximates the cumulative self-suspension behavior of consecutive jobs.
 - `infer_min_suspension_model`: infer a vector that under-approximates the cumulative self-suspension behavior of consecutive jobs.
 - `infer_segmented_suspension_model`: infer per-segment suspension- and execution-time bounds from detailed job observations.
+- `infer_bos_suspension_model`: infer a bag of segmented models that jointly covers detailed job observations.
 
 The above-mentioned APIs are "one-shot" procedures, consuming all given input in one go and producing a model as a result. Additionally, the library provides _streaming extractor_ variants of all these algorithms, which consume input continuously and can be queried at any time to obtain the model inferred _so far_. The streaming extractor classes can be imported from `rt_model_inference.extractors` and are named as follows:
 
@@ -38,7 +39,7 @@ The above-mentioned APIs are "one-shot" procedures, consuming all given input in
 - `DeltaMaxExtractor`, `DeltaMaxHiExtractor`, and `DeltaMaxLoExtractor`
 - `PeriodicExtractor`, `CertainFitPeriodicExtractor`, and `PossibleFitPeriodicExtractor`
 - `MaxResourceUseExtractor` and `MinResourceUseExtractor`
-- `MaxSuspensionModelExtractor`, `MinSuspensionModelExtractor`, and `SegmentedSuspensionModelExtractor`
+- `MaxSuspensionModelExtractor`, `MinSuspensionModelExtractor`, `SegmentedSuspensionModelExtractor`, and `BOSSuspensionModelExtractor`
 
 ## Attribution
 
@@ -349,6 +350,26 @@ assert segmented == [(2, 8), (4, 7), (2, 3)]
 The inferred `SegmentedSuspensionModel` takes the component-wise maximum at each segment position. If any observation exceeds the optional `max_segments` limit, inference returns `None`.
 
 The corresponding streaming extractor is `SegmentedSuspensionModelExtractor`.
+
+#### Bag-of-Segments (BOS) Suspension Model
+
+The "bag of segments" (BOS) model, introduced with LiME ([Brandenburg et al., RTAS 2025](https://doi.org/10.1109/RTAS65571.2025.00033)), keeps separate segmented models when one model would be overly pessimistic. It can be inferred with `infer_bos_suspension_model()`:
+
+```python
+from rt_model_inference import infer_bos_suspension_model
+
+bos = infer_bos_suspension_model(SEGMENTED_JOBS)
+assert bos == [
+    [(2, 5), (3, 7)],
+    [(1, 8), (4, 6), (2, 3)],
+]
+```
+
+Use `max_models` to bound the number of models in the bag and `max_segments` to reject observations with too many segments. The result is `None` when an observation exceeds `max_segments`.
+
+For `max_models == 1`, BOS model inference reduces effectively to regular segmented suspension-model inference.
+
+The corresponding streaming extractor is `BOSSuspensionModelExtractor`.
 
 ## Development
 

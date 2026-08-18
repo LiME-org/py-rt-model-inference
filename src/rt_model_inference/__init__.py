@@ -9,6 +9,7 @@ from .certain_sporadic import (
 )
 from .resource_use import ResourceAmount, infer_max_resource_use, infer_min_resource_use
 from .suspension import (
+    BagOfSegmentsModel,
     BasicJobSuspensionBehavior,
     BasicSuspensionModel,
     ObservedSegment,
@@ -17,6 +18,7 @@ from .suspension import (
     SegmentedSuspensionModel,
     basic_from_segmented_model,
     basic_from_segmented_observation,
+    infer_bos_suspension_model,
     infer_max_suspension_model,
     infer_min_suspension_model,
     infer_segmented_suspension_model,
@@ -33,6 +35,7 @@ from .uncertain_sporadic import (
 )
 
 __all__ = [
+    "BagOfSegmentsModel",
     "BasicJobSuspensionBehavior",
     "BasicSuspensionModel",
     "ObservedSegment",
@@ -43,6 +46,7 @@ __all__ = [
     "SegmentedSuspensionModel",
     "basic_from_segmented_model",
     "basic_from_segmented_observation",
+    "infer_bos_suspension_model",
     "infer_certain_fit_periodic_model",
     "infer_delta_max",
     "infer_delta_max_hi",
