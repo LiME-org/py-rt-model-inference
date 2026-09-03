@@ -1,5 +1,5 @@
 variables:
-  UV_VERSION: "0.10.2"
+  UV_VERSION: "0.12.9"
   BASE_LAYER: trixie-slim
   TEST_ALL_TRACES: "1"
   # GitLab CI creates a separate mountpoint for the build directory,
